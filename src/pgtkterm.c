@@ -5061,85 +5061,6 @@ size_allocate (GtkWidget * widget, GtkAllocation * alloc,
 }
 
 static void
-x_find_modifier_meanings (struct pgtk_display_info *dpyinfo)
-{
-  GdkDisplay *gdpy = dpyinfo->gdpy;
-  GdkKeymap *keymap = gdk_keymap_get_for_display (gdpy);
-  GdkModifierType state = GDK_META_MASK;
-  gboolean r = gdk_keymap_map_virtual_modifiers (keymap, &state);
-  if (r)
-    {
-      /* Meta key exists. */
-      if (state == GDK_META_MASK)
-	{
-	  dpyinfo->meta_mod_mask = GDK_MOD1_MASK;	/* maybe this is meta. */
-	  dpyinfo->alt_mod_mask = 0;
-	}
-      else
-	{
-	  dpyinfo->meta_mod_mask = state & ~GDK_META_MASK;
-	  if (dpyinfo->meta_mod_mask == GDK_MOD1_MASK)
-	    dpyinfo->alt_mod_mask = 0;
-	  else
-	    dpyinfo->alt_mod_mask = GDK_MOD1_MASK;
-	}
-    }
-  else
-    {
-      dpyinfo->meta_mod_mask = GDK_MOD1_MASK;
-      dpyinfo->alt_mod_mask = 0;
-    }
-
-  state = GDK_SUPER_MASK;
-  r = gdk_keymap_map_virtual_modifiers (keymap, &state);
-  if (r)
-    {
-      /* Super key exists. */
-      if (state == GDK_SUPER_MASK)
-	{
-	  dpyinfo->super_mod_mask = GDK_MOD4_MASK;	/* maybe this is super. */
-	}
-      else
-	{
-	  dpyinfo->super_mod_mask = state & ~GDK_SUPER_MASK;
-	}
-    }
-  else
-    {
-      dpyinfo->super_mod_mask = GDK_MOD4_MASK;
-    }
-
-  state = GDK_HYPER_MASK;
-  r = gdk_keymap_map_virtual_modifiers (keymap, &state);
-  if (r)
-    {
-      /* Hyper key exists. */
-      if (state == GDK_HYPER_MASK)
-	{
-	  dpyinfo->hyper_mod_mask = GDK_MOD3_MASK;	/* maybe this is hyper. */
-	}
-      else
-	{
-	  dpyinfo->hyper_mod_mask = state & ~GDK_HYPER_MASK;
-	}
-    }
-  else
-    {
-      dpyinfo->hyper_mod_mask = GDK_MOD3_MASK;
-    }
-
-  /* If xmodmap says:
-   *   $ xmodmap | grep mod4
-   *   mod4        Super_L (0x85),  Super_R (0x86),  Super_L (0xce),  Hyper_L (0xcf)
-   * then, when mod4 is pressed, both of super and hyper are recognized ON.
-   * Maybe many people have such configuration, and they don't like such behavior,
-   * so I disable hyper if such configuration is detected.
-   */
-  if (dpyinfo->hyper_mod_mask == dpyinfo->super_mod_mask)
-    dpyinfo->hyper_mod_mask = 0;
-}
-
-static void
 get_modifier_values (int *mod_ctrl,
 		     int *mod_meta,
 		     int *mod_alt, int *mod_hyper, int *mod_super)
@@ -5187,13 +5108,13 @@ pgtk_gtk_to_emacs_modifiers (struct pgtk_display_info *dpyinfo, int state)
     mod |= shift_modifier;
   if (state & GDK_CONTROL_MASK)
     mod |= mod_ctrl;
-  if (state & dpyinfo->meta_mod_mask)
+  if (state & GDK_MOD1_MASK)
     mod |= mod_meta;
-  if (state & dpyinfo->alt_mod_mask)
-    mod |= mod_alt;
-  if (state & dpyinfo->super_mod_mask)
+  /* if (state & dpyinfo->alt_mod_mask) */
+  /*   mod |= mod_alt; */
+  if (state & GDK_SUPER_MASK)
     mod |= mod_super;
-  if (state & dpyinfo->hyper_mod_mask)
+  if (state & GDK_HYPER_MASK)
     mod |= mod_hyper;
   return mod;
 }
@@ -5212,18 +5133,18 @@ pgtk_emacs_to_gtk_modifiers (struct pgtk_display_info *dpyinfo, int state)
 		       &mod_super);
 
   mask = 0;
-  if (state & mod_alt)
-    mask |= dpyinfo->alt_mod_mask;
+  /* if (state & mod_alt) */
+  /*   mask |= ; */
   if (state & mod_super)
-    mask |= dpyinfo->super_mod_mask;
+    mask |= GDK_SUPER_MASK;
   if (state & mod_hyper)
-    mask |= dpyinfo->hyper_mod_mask;
+    mask |= GDK_HYPER_MASK;
   if (state & shift_modifier)
     mask |= GDK_SHIFT_MASK;
   if (state & mod_ctrl)
     mask |= GDK_CONTROL_MASK;
   if (state & mod_meta)
-    mask |= dpyinfo->meta_mod_mask;
+    mask |= GDK_MOD1_MASK;
   return mask;
 }
 
@@ -5310,8 +5231,7 @@ key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
        * key events ignoring super.
        * As a work around, don't call it while super or hyper are pressed...
        */
-      struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-      if (!(event->key.state & (dpyinfo->super_mod_mask | dpyinfo->hyper_mod_mask)))
+      if (!(event->key.state & (GDK_SUPER_MASK | GDK_HYPER_MASK)))
 	{
 	  if (pgtk_im_filter_keypress (f, &event->key))
 	    return TRUE;
@@ -6683,9 +6603,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   char *nametail = lispstpcpy (dpyinfo->x_id_name, Vinvocation_name);
   *nametail++ = '@';
   lispstpcpy (nametail, system_name);
-
-  /* Figure out which modifier bits mean what.  */
-  x_find_modifier_meanings (dpyinfo);
 
   /* Get the scroll bar cursor.  */
   /* We must create a GTK cursor, it is required for GTK widgets.  */
